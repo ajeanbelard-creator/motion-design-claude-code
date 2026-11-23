@@ -20,3 +20,6 @@ _references/
 !examples/*.mp4
 !examples/*/*.mp4
 !examples/*/*/*.mp4
+
+# Python bytecode (ui-ux-pro-max scripts)
+__pycache__/

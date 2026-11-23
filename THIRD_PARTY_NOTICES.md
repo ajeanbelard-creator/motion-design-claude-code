@@ -31,6 +31,25 @@ La copie n'est pas identique à l'amont : elle a été durcie pendant l'audit du
 - `media-use/audio/assets/sfx/*.mp3` : bruitages de [Pixabay](https://pixabay.com/sound-effects/), [Pixabay Content License](https://pixabay.com/service/license-summary/) (détail dans `CREDITS.md` du même dossier). Ce sont les bruitages utilisés par le mixage de la méthode.
 - `hyperframes-creative/frame-presets/code-editorial/fonts/` : EB Garamond, Inter, JetBrains Mono, SIL Open Font License 1.1 (textes de licence dans le même dossier).
 
+## Skill UI UX Pro Max (Next Level Builder)
+
+- **Auteur** : Next Level Builder (© 2024 Next Level Builder)
+- **Licence** : MIT, texte complet dans `.claude/skills/LICENSE-UI-UX-PRO-MAX-MIT`.
+- **Source** : https://github.com/nextlevelbuilder/ui-ux-pro-max-skill, dossier `.claude/skills/ui-ux-pro-max/`
+- **Commit audité** : `281e4537afb11333ac9947783779aaf314ebfbf2` (court : `281e453`), relecture du 2026-11-23 : scripts Python
+  sans dépendance externe, aucun appel réseau, aucune commande shell. Les pages d'aperçu HTML générées par `--preview`
+  chargent leurs polices depuis Google Fonts à l'ouverture.
+- **Dossier copié** dans `.claude/skills/` : `ui-ux-pro-max` (les autres skills du dépôt amont ne sont pas inclus).
+
+### Fichiers modifiés (MIT)
+
+| Fichier | Changement |
+|---|---|
+| `ui-ux-pro-max/SKILL.md` | chemin `"${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max/scripts/search.py"` remplacé par `.claude/skills/ui-ux-pro-max/scripts/search.py` (installation dans le dépôt, pas en plugin) |
+| `ui-ux-pro-max/scripts/tests/` | supprimé |
+
+Tous les autres fichiers sont identiques à ceux du commit `281e453`.
+
 ## Éléments que tu récupères toi-même (non inclus)
 
 - **Polices** : Instrument Sans, Space Mono et Big Shoulders, [Google Fonts](https://fonts.google.com), SIL Open Font License 1.1. Téléchargées dans chaque projet (commandes dans `.claude/skills/motion-design/references/method.md`).

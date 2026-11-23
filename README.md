@@ -210,6 +210,9 @@ plusieurs consignes envoyaient des données ou mettaient le logiciel à jour san
 - **Skills figés** au commit audité `93ab289` (`.claude/skills/AUDITED_COMMIT.txt`), avec les passages à risque
   neutralisés (envois de « feedback » vers un canal public, mises à jour automatiques, installation d'un skill tiers
   non audité, serveur local ouvert sur le réseau). La liste exacte est dans `THIRD_PARTY_NOTICES.md`.
+- **Skill UI UX Pro Max** (conseils de design d'interface, MIT) : relu le 2026-11-23 et figé au commit `281e453`.
+  Il fonctionne entièrement en local (scripts Python, sans dépendance ni appel réseau). Détail dans
+  `THIRD_PARTY_NOTICES.md`.
 - **Version figée** : HyperFrames 0.8.82, toutes dépendances verrouillées par `package-lock.json`. Jamais de
   `@latest`.
 - **Télémétrie coupée** : variables d'environnement dans `.claude/settings.json` et `npx hyperframes telemetry disable`
