@@ -3,13 +3,31 @@
 Source : `recon.md` et `features.csv`. Cette architecture couvre la **V1** (les 48 lignes
 `must`) et laisse la place aux versions suivantes sans tout refaire.
 
-Réseaux en V1 : **Bluesky, Instagram, Facebook, LinkedIn**.
-- **Bluesky** : API ouverte, aucune validation d'application. On s'en sert pour tester toute la
-  boucle dès le premier jour.
-- **Instagram et Facebook** : une seule application Meta et une seule validation (« App Review »).
-- **LinkedIn** : programme « Community Management API » à demander.
+Réseaux en V1 : **Bluesky, Instagram, Facebook, LinkedIn, YouTube, TikTok, WhatsApp, Telegram**.
 
-Les demandes Meta et LinkedIn sont à lancer **dès maintenant**, car elles prennent des semaines.
+| réseau | API officielle | validation à obtenir | ce que Direct Pub fait |
+| --- | --- | --- | --- |
+| Bluesky | protocole AT | aucune | publier, statistiques ; sert à tester la boucle dès le 1er jour |
+| Telegram | Bot API | aucune | le bot Direct Pub, admin de la chaîne ou du groupe, publie texte, photo, vidéo, album ; abonnés par jour |
+| Instagram, Facebook | Graph API Meta | App Review Meta | publier, statistiques |
+| WhatsApp | WhatsApp Business Cloud API (Meta) | App Review Meta + compte WhatsApp Business vérifié | **diffusion** de messages à des listes de contacts consentants, via des modèles approuvés par Meta |
+| LinkedIn | Community Management API | programme partenaire LinkedIn | publier, statistiques |
+| YouTube | YouTube Data API v3 + Analytics API | vérification de l'appli Google + audit de quota | mettre en ligne vidéos et Shorts, statistiques |
+| TikTok | Content Posting API + Display API | revue de l'appli + audit Content Posting | publier vidéos et carrousels photo, statistiques |
+
+À savoir :
+- **WhatsApp n'a pas d'API pour publier sur une Chaîne ou un Statut.** La seule publication
+  possible est l'envoi de messages à des contacts qui ont accepté d'en recevoir. Ces messages
+  sont facturés par Meta au compte WhatsApp Business du client, pas à Direct Pub.
+- **TikTok** : tant que l'application n'a pas passé l'audit, ses posts restent privés (« moi
+  uniquement ») et 5 comptes au plus peuvent publier par 24 h.
+- **YouTube** : une mise en ligne consomme une grande part du quota quotidien de 10 000 unités
+  du projet. Les vidéos envoyées par un projet non audité restent privées.
+- **Telegram** : l'API des bots ne donne pas le nombre de vues par message, seulement le nombre
+  d'abonnés.
+
+Les demandes Meta (une seule pour Instagram, Facebook et WhatsApp), LinkedIn, Google et TikTok
+sont à lancer **dès maintenant**, car elles prennent des semaines.
 
 ## Pile technique
 
@@ -28,7 +46,8 @@ Les demandes Meta et LinkedIn sont à lancer **dès maintenant**, car elles pren
 | tâches | Inngest (planification + reprises + délais) | publication à l'heure, synchronisation quotidienne et reprises sans serveur à gérer |
 | fichiers | Cloudflare R2 | les réseaux téléchargent les médias par URL publique ; R2 ne facture pas la sortie |
 | e-mail | Resend | e-mails transactionnels (invitations, alertes d'échec) |
-| paiements | Stripe Checkout + Billing + portail client | plans, mensuel / annuel, factures sans écran maison |
+| paiements | Moneroo (API « Standard » : lien de paiement + webhook signé + vérification) | mobile money, cartes et portefeuilles en Afrique avec une seule intégration |
+| reçus | PDF généré par Direct Pub (react-pdf) | Moneroo n'émet pas de factures d'abonnement |
 | chiffrement | AES-256-GCM avec une clé dans les variables d'environnement | les jetons d'accès aux réseaux ne sont jamais stockés en clair |
 | erreurs | Sentry | voir tout de suite pourquoi une publication échoue |
 | hébergement | Vercel | déploiement à chaque push, cron et fonctions inclus |
@@ -37,14 +56,15 @@ Une seule base, une seule application. Pas de microservices.
 
 ## Schéma
 
-`schema.sql` : **18 tables** en V1, plus 5 rôles par défaut. Vérifié sur Postgres 16 : le
+`schema.sql` : **24 tables** en V1, plus 5 rôles par défaut. Vérifié sur Postgres 16 : le
 fichier se charge sans erreur, et les contraintes clés rejettent les mauvaises données (deux
-comptes du même réseau dans une marque, post planifié sans date, permission inconnue).
+comptes du même réseau dans une marque, post planifié sans date, permission inconnue, connexion
+sans jeton hors Telegram, numéro WhatsApp mal formé, paiement réussi sans période).
 
 | table | rôle |
 | --- | --- |
 | `users` | profil (fuseau, langue, 1er jour de semaine) ; l'id est celui de Supabase Auth |
-| `organizations` | propriétaire, plan, client Stripe |
+| `organizations` | propriétaire, plan |
 | `roles` | rôles par défaut (verrouillés) et personnalisés (V2), liste de permissions contrôlée |
 | `memberships` | qui appartient à quelle organisation, avec quel rôle |
 | `invitations` | invitation par e-mail, jeton haché, expiration 24 h |
@@ -59,8 +79,13 @@ comptes du même réseau dans une marque, post planifié sans date, permission i
 | `account_metrics_daily` | abonnés, portée, impressions par jour et par compte |
 | `sync_runs` | journal des synchronisations (rattrapage d'historique, quotidienne) |
 | `notifications` | centre de notifications, sans doublon (`dedupe_key`) |
-| `subscriptions` | état de l'abonnement Stripe |
-| `stripe_events` | webhooks Stripe déjà traités |
+| `contacts` | contacts WhatsApp d'une marque, avec consentement et désinscription |
+| `contact_lists`, `contact_list_members` | listes de diffusion WhatsApp |
+| `whatsapp_templates` | modèles de message synchronisés depuis Meta, avec leur statut d'approbation |
+| `message_deliveries` | un envoi WhatsApp par destinataire : envoyé, livré, lu, échec |
+| `subscriptions` | plan, période payée, fin de la période de grâce, dernier rappel |
+| `payments` | chaque paiement Moneroo : plan, montant, devise, période couverte, numéro de reçu |
+| `payment_events` | webhooks Moneroo déjà traités |
 
 Règles suivies partout : `uuid` en clé, `timestamptz` en UTC, règle `on delete` choisie pour
 chaque clé étrangère, index sur chaque clé étrangère et chaque colonne filtrée, statuts en
@@ -104,6 +129,8 @@ les routes HTTP servent aux OAuth, aux webhooks et aux appels du navigateur (env
 | GET `/api/connect/[network]/start` | lance l'OAuth du réseau (état signé avec la marque) | `brand.manage` | brandId | redirection vers le réseau |
 | GET `/api/connect/[network]/callback` | échange le code, chiffre les jetons, crée la connexion, lance le rattrapage d'historique | réseau | code, état | redirection S03 |
 | action `connectBluesky` | Bluesky n'a pas d'OAuth classique : identifiant + mot de passe d'application | `brand.manage` | handle, mot de passe d'application | connexion |
+| action `startTelegramLink` | donne un code à usage unique et le nom du bot à ajouter comme admin de la chaîne ou du groupe | `brand.manage` | brandId | code, lien |
+| GET `/api/connect/whatsapp/start` | « Embedded Signup » Meta : le client choisit ou crée son compte WhatsApp Business et son numéro | `brand.manage` | brandId | fenêtre Meta |
 | action `chooseAccount` | quand l'OAuth renvoie plusieurs pages ou comptes, choisir lequel | `brand.manage` | id externe | connexion |
 | action `refreshConnection` | relance l'OAuth pour un compte expiré | `brand.manage` | connectionId | redirection |
 | action `revokeConnection` | révoque le jeton chez le réseau, marque `revoked` (historique conservé) | `brand.manage` | connectionId | ok |
@@ -122,6 +149,20 @@ les routes HTTP servent aux OAuth, aux webhooks et aux appels du navigateur (env
 | action `duplicatePost` | copie en brouillon (même marque) | `planner.edit` | postId | post |
 | action `deletePost` | suppression douce ; refusée pendant la publication | `planner.edit` | postId | ok |
 | action `retryVariant` | relance une déclinaison en échec | `posts.publish` | variantId | déclinaison |
+
+### Diffusion WhatsApp (nouveaux écrans : contacts, listes)
+
+| méthode chemin | rôle | qui | entrée | sortie |
+| --- | --- | --- | --- | --- |
+| GET `/api/contacts?brand&list&q&page` | contacts et listes | `planner.view` | filtres | contacts |
+| action `saveContact` / `deleteContact` | ajout, modification, suppression | `planner.edit` | numéro (E.164), nom, preuve de consentement | contact |
+| action `importContacts` | import CSV ; refuse les lignes sans consentement, rapport des erreurs | `planner.edit` | fichier | rapport |
+| action `saveContactList` | créer, renommer une liste, ajouter ou retirer des contacts | `planner.edit` | liste, contacts | liste |
+| action `syncTemplates` | relit les modèles et leur statut chez Meta | `planner.edit` | connectionId | modèles |
+
+Le post WhatsApp passe par le même éditeur (S08) : type `broadcast`, choix d'un modèle
+approuvé, valeurs des variables et liste de destinataires. À l'envoi, les contacts désinscrits
+ou sans consentement sont exclus.
 
 ### F12 Statistiques (S17, S18)
 
@@ -147,14 +188,25 @@ les routes HTTP servent aux OAuth, aux webhooks et aux appels du navigateur (env
 | --- | --- | --- | --- | --- |
 | GET `/api/notifications` | liste et nombre de non lues | connecté | page | notifications |
 | action `markNotificationsRead` | marque lu | connecté | ids ou tout | ok |
-| action `startCheckout` | session Stripe Checkout | `billing.manage` | plan, cycle | url |
-| action `openBillingPortal` | portail client Stripe (carte, factures, annulation) | `billing.manage` | — | url |
+| action `startCheckout` | crée un `payment` puis appelle `POST /v1/payments/initialize` de Moneroo (montant, devise, client, `return_url`, métadonnées) | `billing.manage` | plan, cycle | `checkout_url` |
+| GET `/billing/return?paymentId=` | retour du client : vérifie le paiement chez Moneroo et affiche le résultat | connecté | id | page |
+| GET `/api/billing/receipts/[id]` | reçu PDF d'un paiement réussi | `billing.manage` | id | PDF |
+| action `cancelRenewal` | arrête les rappels ; le plan reste actif jusqu'à la fin de la période payée | `billing.manage` | — | ok |
 
 ### Webhooks entrants
 
-- **Stripe** (`POST /api/webhooks/stripe`) : `checkout.session.completed`,
-  `customer.subscription.updated` / `deleted`, `invoice.payment_failed`. La signature est
-  vérifiée, et l'id d'événement est noté dans `stripe_events` pour ne jamais traiter deux fois.
+- **Moneroo** (`POST /api/webhooks/moneroo`) : on vérifie l'en-tête `X-Moneroo-Signature`
+  (HMAC du corps brut avec le secret du webhook), puis on **revérifie le paiement par l'API**
+  (`GET /v1/payments/{id}/verify`) avant d'activer quoi que ce soit. L'événement est noté dans
+  `payment_events` pour ne jamais être traité deux fois. Un paiement réussi prolonge la période
+  à partir de la fin de la période en cours, ou d'aujourd'hui si elle est passée.
+- **WhatsApp** (`POST /api/webhooks/whatsapp`) : statuts des messages (envoyé, livré, lu, échec)
+  → `message_deliveries` ; messages entrants « STOP » → désinscription immédiate ; changement de
+  statut d'un modèle. Signature `X-Hub-Signature-256` vérifiée.
+- **Telegram** (`POST /api/webhooks/telegram`, jeton secret dans l'en-tête) : le bot est ajouté
+  ou retiré d'une chaîne (`my_chat_member`) ; le code à usage unique envoyé dans la chaîne la
+  rattache à la bonne marque.
+- **TikTok** : fin de traitement d'une publication (sinon interrogation du statut).
 - **Meta** (`POST /api/webhooks/meta`) : désautorisation de l'application et demandes de
   suppression de données. Ce sont des exigences de la validation Meta.
 
@@ -169,11 +221,16 @@ Webhooks sortants : aucun en V1.
 | `connection/backfill` | à la connexion | récupère l'historique disponible (30 jours minimum) : posts, métriques, abonnés |
 | `metrics/daily` | chaque nuit, par marque, échelonné | synchronise abonnés, métriques de compte et métriques des posts des 90 derniers jours |
 | `tokens/refresh` | toutes les 6 h | renouvelle les jetons qui expirent sous 7 jours ; sinon `expired` + notification |
+| `billing/renewals` | chaque jour | rappels par e-mail et dans l'appli 7 jours, 1 jour et le jour de l'échéance, avec un lien de paiement Moneroo neuf |
+| `billing/expire` | chaque jour | à l'échéance : `past_due` et 7 jours de grâce ; ensuite retour au plan gratuit (les marques en trop passent en lecture seule, rien n'est supprimé) |
+| `whatsapp/broadcast` | à l'heure du post | envoie le modèle à chaque contact de la liste, à la cadence permise par Meta, une ligne `message_deliveries` par destinataire |
+| `whatsapp/templates` | toutes les 6 h | resynchronise les modèles et leur statut |
 | `users/purge` | chaque nuit | supprime pour de bon les comptes supprimés depuis 30 jours (RGPD) |
 | `media/cleanup` | chaque semaine | supprime de R2 les médias rattachés à aucun post depuis 7 jours |
 
 Uniquement des API officielles et publiques, avec les clés de Direct Pub : Graph API Meta,
-API LinkedIn, protocole AT de Bluesky. Jamais les points d'accès privés de Metricool.
+WhatsApp Business Cloud API, API LinkedIn, protocole AT de Bluesky, YouTube Data et Analytics,
+TikTok Content Posting et Display, Telegram Bot API, Moneroo. Jamais les points d'accès privés de Metricool.
 
 ## Les parties qui mordent
 
@@ -183,7 +240,9 @@ API LinkedIn, protocole AT de Bluesky. Jamais les points d'accès privés de Met
   des statistiques sont comptés dans le fuseau de la marque.
 - **Idempotence** : une déclinaison ne doit jamais être publiée deux fois. Avant l'appel au
   réseau, on la verrouille (`update ... set status='publishing' where status='pending'`) ; la
-  clé de tentative est unique dans `publish_attempts`. Les webhooks Stripe sont dédoublonnés.
+  clé de tentative est unique dans `publish_attempts`. Les webhooks Moneroo sont dédoublonnés,
+  et une diffusion WhatsApp ne peut envoyer qu'un message par contact (`unique` dans
+  `message_deliveries`), même si la tâche est relancée.
   Les notifications aussi (`dedupe_key`).
 - **Courses** :
   - un post modifié ou supprimé pendant sa publication : refusé dès que le statut est `publishing` ;
@@ -205,6 +264,18 @@ API LinkedIn, protocole AT de Bluesky. Jamais les points d'accès privés de Met
   actions et routes avec un utilisateur d'une autre organisation et attend un refus partout.
 - **Limites du plan** : nombre de marques et de posts par mois, vérifiés côté serveur, jamais
   seulement dans l'interface.
+- **Paiements sans prélèvement automatique** : Moneroo encaisse un paiement à la fois. Le
+  renouvellement dépend donc des rappels. Un client qui paie en retard ne perd rien pendant la
+  période de grâce ; un paiement en double prolonge la période au lieu d'être perdu. Montants en
+  entiers dans la plus petite unité de la devise (le franc CFA n'a pas de centimes). Prix et
+  devises à fixer (ex. XOF et EUR).
+- **WhatsApp et consentement** : Meta bloque les numéros qui écrivent sans consentement ou
+  reçoivent trop de signalements. On exige une preuve de consentement à l'import, on traite
+  « STOP » tout de suite, et l'envoi suit le palier de messages autorisé du numéro.
+- **TikTok et YouTube** : la vidéo passe par une mise en ligne en plusieurs morceaux ; on suit
+  le statut de traitement avant de marquer le post comme publié. Les quotas YouTube sont par
+  projet : un compteur arrête les mises en ligne avant d'atteindre la limite et les décale au
+  lendemain, avec une alerte.
 - **Délivrabilité des e-mails** : domaine d'envoi avec SPF, DKIM et DMARC dès le premier jour.
 - **RGPD** : suppression du compte en deux temps (désactivation puis purge à 30 jours), export
   des données en V2, webhooks de suppression Meta, hébergement des données en Europe (région
@@ -233,15 +304,22 @@ Inscription → création de marque → connexion Bluesky → écrire un post �
    publier maintenant, dupliquer (S08 ; tables `media`, `post_variant_media`).
 4. **Calendrier complet** : vues jour / semaine / mois, Aujourd'hui, glisser-déposer, couleurs
    de statut, icônes de réseau et de type (S06).
-5. **Connexions Meta et LinkedIn** : OAuth, choix du compte, renouvellement, révocation,
-   alertes (S03 ; tâche `tokens/refresh`).
-6. **Statistiques** : rattrapage, synchronisation quotidienne, résumé, page par réseau,
+5. **Connexions Meta, LinkedIn, YouTube, TikTok** : OAuth, choix du compte, renouvellement,
+   révocation, alertes ; options obligatoires de YouTube (titre, confidentialité) et de TikTok
+   (confidentialité, commentaires, duo, collage, contenu commercial) dans l'éditeur (S03, S08 ;
+   tâche `tokens/refresh`).
+6. **Telegram** : liaison par le bot, publication texte, photo, vidéo et album, abonnés par
+   jour (S03, S08).
+7. **WhatsApp** : inscription intégrée Meta, contacts et listes avec consentement, modèles,
+   diffusion, statuts de livraison (nouveaux écrans contacts et listes ; tables `contacts`,
+   `contact_lists`, `whatsapp_templates`, `message_deliveries`).
+8. **Statistiques** : rattrapage, synchronisation quotidienne, résumé, page par réseau,
    comparaison de périodes, liste des posts triable avec colonnes au choix (S17, S18 ;
    tables `published_posts`, `account_metrics_daily`, `sync_runs`).
-7. **Équipe** : invitation de membres, rôles par défaut (S34 ; `invitations`).
-8. **Notifications** : centre de notifications, alertes d'échec et de déconnexion (S38).
-9. **Abonnement** : plans et limites, Stripe Checkout et portail (S36 ; `subscriptions`,
-   `stripe_events`).
+9. **Équipe** : invitation de membres, rôles par défaut (S34 ; `invitations`).
+10. **Notifications** : centre de notifications, alertes d'échec et de déconnexion (S38).
+11. **Abonnement** : plans et limites, paiement Moneroo, reçus PDF, rappels de
+    renouvellement, période de grâce (S36 ; `subscriptions`, `payments`, `payment_events`).
 
 ### 3. Ensuite
 

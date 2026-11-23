@@ -410,7 +410,9 @@ Connection 1-n InboxThread 1-n InboxMessage, Brand 1-n AdAccount 1-n AdCampaign.
 
 ## Matrice des fonctionnalités
 
-Voir `features.csv` : 219 lignes. Must : 48, should : 84, could : 73, skip : 14.
+Voir `features.csv` : 233 lignes. Must : 60, should : 84, could : 75, skip : 14.
+14 lignes sont des ajouts de Direct Pub (WhatsApp, Telegram, paiement par période) : elles
+portent `original = no` et ne comptent pas dans le score de parité.
 
 `must` = la boucle centrale (compte, marques, connexions, éditeur, calendrier, publication
 automatique, statistiques de base, équipe minimale). Le reste est classé pour la suite.
@@ -450,9 +452,10 @@ automatique, statistiques de base, équipe minimale). Le reste est classé pour 
   Ensuite : la messagerie unifiée (webhooks par réseau), la validation, les fonctions IA.
 - **Taille : XL.** Tout Metricool de A à Z, c'est plusieurs trimestres. Il faut découper en
   versions :
-  - **V1 (M, quelques semaines)** : les lignes `must`, avec 3 ou 4 réseaux (par exemple
-    Instagram, Facebook, LinkedIn, Bluesky ; Bluesky n'a pas de validation d'application et
-    permet de tester tout de suite).
+  - **V1** : les lignes `must`, avec 8 réseaux : Instagram, Facebook, LinkedIn, Bluesky,
+    YouTube, TikTok, plus WhatsApp et Telegram (ajouts de Direct Pub, absents de Metricool).
+    Paiement par Moneroo. Bluesky et Telegram n'ont pas de validation d'application et
+    permettent de tester tout de suite.
   - **V2 (L)** : les lignes `should` : réseaux restants, messagerie, validation, rapports,
     bibliothèque, autolistes, concurrents.
   - **V3** : les lignes `could` : pubs, Flows, Studio IA, tableaux de campagne, hashtags.

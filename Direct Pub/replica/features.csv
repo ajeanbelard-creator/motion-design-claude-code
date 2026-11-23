@@ -31,10 +31,12 @@ Connexion LinkedIn (page ou profil),connexions,must,yes,no,
 Connexion Bluesky,connexions,must,yes,no,pas de validation d'appli : idéal pour tester
 Connexion Threads,connexions,should,yes,no,
 Connexion X,connexions,should,yes,no,API payante
-Connexion TikTok,connexions,should,yes,no,
-Connexion YouTube,connexions,should,yes,no,
+Connexion TikTok,connexions,must,yes,no,
+Connexion YouTube,connexions,must,yes,no,
 Connexion Pinterest,connexions,should,yes,no,
 Connexion Google Business Profile,connexions,should,yes,no,
+Connexion WhatsApp Business (Cloud API),connexions,must,no,no,ajout Direct Pub ; validation Meta
+Connexion Telegram (chaîne ou groupe via le bot Direct Pub),connexions,must,no,no,ajout Direct Pub ; sans validation
 Connexion Twitch (statistiques seules),connexions,could,yes,no,
 Connexion site web / blog (script de suivi),connexions,could,yes,no,
 Rafraîchir ou reconnecter un réseau expiré,connexions,must,yes,no,
@@ -85,8 +87,8 @@ Identifier des personnes,editeur,could,yes,no,
 Carrousels,editeur,should,yes,no,
 "Reels, Stories, Shorts",editeur,should,yes,no,
 Documents LinkedIn (PDF),editeur,could,yes,no,
-"Options YouTube (titre, confidentialité, playlist, catégorie, tags)",editeur,should,yes,no,
-"Options TikTok (commentaires, duo, collage, contenu commercial)",editeur,should,yes,no,
+"Options YouTube (titre, confidentialité, playlist, catégorie, tags)",editeur,must,yes,no,titre et confidentialité obligatoires
+"Options TikTok (commentaires, duo, collage, contenu commercial)",editeur,must,yes,no,exigé par les règles de publication TikTok
 "Options Pinterest (tableau, lien, titre)",editeur,should,yes,no,
 Langue du post (Bluesky),editeur,could,yes,no,
 Mention de contenu généré par IA,editeur,should,yes,no,exigence réglementaire
@@ -197,10 +199,12 @@ Préférences e-mail / in-app par type,notifications,should,yes,no,
 Notifications de notes et mentions,notifications,could,yes,no,
 Étiquettes colorées sur les posts,etiquettes,should,yes,no,
 Étiquetage automatique par IA,etiquettes,could,yes,no,
+Rappels de renouvellement par e-mail avec lien de paiement,abonnement,must,no,no,Moneroo n'a pas d'abonnement automatique
+Retour au plan gratuit après la période de grâce,abonnement,must,no,no,
 "Plans et limites (marques, posts par mois)",abonnement,must,yes,no,
-Paiement par carte (Stripe),abonnement,must,yes,no,
-Factures téléchargeables,abonnement,should,yes,no,
-Mensuel / annuel,abonnement,should,yes,no,
+Paiement mobile money et carte (Moneroo),abonnement,must,yes,no,remplace Stripe
+Reçus PDF téléchargeables,abonnement,should,yes,no,générés par Direct Pub
+Mensuel / annuel,abonnement,should,yes,no,"paiement par période, pas de prélèvement automatique"
 Add-ons,abonnement,could,yes,no,
 Codes promo,abonnement,could,yes,no,
 API publique avec jeton,api,could,yes,no,
@@ -218,3 +222,13 @@ Meilleurs horaires génériques issus d'études,autres,skip,yes,no,données prop
 Historique des concurrents stocké par d'autres utilisateurs,autres,skip,yes,no,base de données de Metricool
 Resynchronisation d'historique par le support,autres,skip,yes,no,"service, pas fonctionnalité"
 Adobe Express,autres,skip,yes,no,plus tard
+Diffusion WhatsApp à une liste de contacts (modèle approuvé),whatsapp,must,no,no,pas d'API pour les Chaînes ni les Statuts
+Contacts et listes WhatsApp avec consentement (opt-in / désinscription),whatsapp,must,no,no,obligatoire chez Meta
+Synchronisation des modèles de message WhatsApp,whatsapp,must,no,no,
+Import CSV de contacts WhatsApp,whatsapp,should,no,no,
+Statistiques WhatsApp envoyés / livrés / lus / échecs,whatsapp,should,no,no,via webhooks de statut
+Réponses WhatsApp dans la messagerie,whatsapp,should,no,no,fenêtre de 24 h
+"Publication Telegram texte, photo, vidéo, album",telegram,must,no,no,
+Sondage Telegram,telegram,could,no,no,
+Épingler un message Telegram,telegram,could,no,no,
+Abonnés Telegram par jour,telegram,should,no,no,l'API des bots ne donne pas les vues par message

@@ -37,7 +37,6 @@ create table organizations (
   name text not null check (length(name) between 1 and 120),
   owner_user_id uuid not null references users(id) on delete restrict, -- supprimer l'orga d'abord
   plan text not null default 'free' check (plan in ('free','starter','pro','agency')),
-  stripe_customer_id text unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -108,19 +107,24 @@ create table connections (
   id uuid primary key default gen_random_uuid(),
   brand_id uuid not null references brands(id) on delete cascade,
   network text not null check (network in (
-    'instagram','facebook','linkedin','bluesky',            -- V1
-    'threads','x','tiktok','youtube','pinterest','google_business','twitch')),
+    'instagram','facebook','linkedin','bluesky','youtube','tiktok','whatsapp','telegram', -- V1
+    'threads','x','pinterest','google_business','twitch')),
   external_account_id text not null,
   display_name text not null,
   handle text,
   avatar_url text,
-  account_type text,                                       -- business, creator, page, profile...
-  access_token_enc bytea not null,                         -- chiffré AES-256-GCM côté serveur
+  account_type text,                                       -- business, creator, page, profile, channel, group...
+  -- WhatsApp : external_account_id = id du numéro, extra.waba_id = compte WhatsApp Business.
+  -- Telegram : external_account_id = id de la chaîne ou du groupe ; pas de jeton, le bot
+  -- Direct Pub (jeton en variable d'environnement) doit y être administrateur.
+  extra jsonb not null default '{}',
+  access_token_enc bytea,                                  -- chiffré AES-256-GCM côté serveur
   refresh_token_enc bytea,
   token_expires_at timestamptz,
   scopes text[] not null default '{}',
   status text not null default 'active' check (status in ('active','expired','error','revoked')),
   last_error text,
+  constraint token_required check (network = 'telegram' or access_token_enc is not null),
   history_backfilled_at timestamptz,
   last_synced_at timestamptz,
   connected_by uuid references users(id) on delete set null,
@@ -179,9 +183,12 @@ create table post_variants (
   connection_id uuid not null references connections(id) on delete restrict, -- garder l'historique
   network text not null,
   post_type text not null default 'post' check (post_type in (
-    'post','reel','story','carousel','video','short','thread','poll','pin','document')),
+    'post','reel','story','carousel','video','short','thread','poll','pin','document',
+    'album','broadcast')),                                 -- album : Telegram ; broadcast : diffusion WhatsApp
   text text not null default '',
-  options jsonb not null default '{}',                     -- lieu, premier commentaire, etc. (V2)
+  options jsonb not null default '{}',                     -- YouTube : titre, confidentialité ; TikTok : confidentialité,
+                                                           -- commentaires, duo, collage, contenu commercial ;
+                                                           -- WhatsApp : template_id, variables, contact_list_id
   status text not null default 'pending' check (status in ('pending','publishing','published','failed')),
   attempts smallint not null default 0,
   external_post_id text,
@@ -214,6 +221,66 @@ create table publish_attempts (
   response jsonb
 );
 create index on publish_attempts (post_variant_id);
+
+-- ---------------------------------------------------------------- WhatsApp : contacts, listes, modèles
+
+-- Meta n'offre pas d'API pour publier sur une Chaîne ou un Statut WhatsApp. Direct Pub diffuse
+-- donc des messages à des contacts qui ont accepté de les recevoir, via des modèles approuvés.
+create table contacts (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references brands(id) on delete cascade,
+  phone_e164 text not null check (phone_e164 ~ '^\+[1-9][0-9]{6,14}$'),
+  name text,
+  opted_in_at timestamptz,                                 -- consentement obligatoire pour recevoir une diffusion
+  opt_in_source text,                                      -- formulaire, import avec preuve, message entrant...
+  opted_out_at timestamptz,                                -- « STOP » ou désinscription : plus aucun envoi
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (brand_id, phone_e164)
+);
+
+create table contact_lists (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references brands(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (brand_id, name)
+);
+
+create table contact_list_members (
+  contact_list_id uuid not null references contact_lists(id) on delete cascade,
+  contact_id uuid not null references contacts(id) on delete cascade,
+  added_at timestamptz not null default now(),
+  primary key (contact_list_id, contact_id)
+);
+create index on contact_list_members (contact_id);
+
+create table whatsapp_templates (
+  id uuid primary key default gen_random_uuid(),
+  connection_id uuid not null references connections(id) on delete cascade,
+  external_id text not null,
+  name text not null,
+  language text not null,
+  category text not null check (category in ('marketing','utility','authentication')),
+  status text not null check (status in ('approved','pending','rejected','paused','disabled')),
+  components jsonb not null,                               -- en-tête, corps, boutons, variables
+  synced_at timestamptz not null default now(),
+  unique (connection_id, external_id)
+);
+
+-- Un envoi par destinataire, mis à jour par les webhooks de statut de Meta.
+create table message_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  post_variant_id uuid not null references post_variants(id) on delete cascade,
+  contact_id uuid references contacts(id) on delete set null,
+  external_message_id text unique,                         -- wamid
+  status text not null default 'queued' check (status in ('queued','sent','delivered','read','failed')),
+  error text,
+  updated_at timestamptz not null default now(),
+  unique (post_variant_id, contact_id)                     -- jamais deux envois au même contact
+);
+create index on message_deliveries (post_variant_id, status);
 
 -- ---------------------------------------------------------------- statistiques
 
@@ -268,7 +335,7 @@ create table notifications (
   brand_id uuid references brands(id) on delete cascade,
   type text not null check (type in (
     'post_failed','post_published_with_warnings','connection_lost',
-    'invitation_accepted','plan_limit','payment_failed')),
+    'invitation_accepted','plan_limit','payment_failed','renewal_due','plan_expired')),
   payload jsonb not null default '{}',
   dedupe_key text,                                         -- évite les doublons (même erreur, même post)
   read_at timestamptz,
@@ -280,22 +347,47 @@ create index notifications_unread on notifications (user_id) where read_at is nu
 
 -- ---------------------------------------------------------------- abonnement
 
+-- Paiement par Moneroo (mobile money, carte...). Pas de prélèvement automatique : chaque
+-- période est payée par un lien, envoyé avec des rappels avant l'échéance.
 create table subscriptions (
   organization_id uuid primary key references organizations(id) on delete cascade,
-  stripe_subscription_id text unique,
   plan text not null check (plan in ('free','starter','pro','agency')),
   cycle text check (cycle in ('month','year')),
-  status text not null check (status in ('active','trialing','past_due','canceled','incomplete')),
-  current_period_end timestamptz,
-  cancel_at_period_end boolean not null default false,
+  status text not null check (status in ('active','past_due','expired','canceled')),
+  current_period_end timestamptz,                          -- null pour le plan gratuit
+  grace_ends_at timestamptz,                               -- après : retour au plan gratuit
+  last_reminder_kind text check (last_reminder_kind in ('d7','d1','d0','grace')),
   updated_at timestamptz not null default now()
 );
 
--- Événements Stripe déjà traités (les webhooks arrivent parfois deux fois).
-create table stripe_events (
-  id text primary key,
-  type text not null,
-  received_at timestamptz not null default now()
+create table payments (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete restrict, -- garder la compta
+  initiated_by uuid references users(id) on delete set null,
+  moneroo_payment_id text unique,                          -- rempli au retour de l'initialisation
+  plan text not null check (plan in ('starter','pro','agency')),
+  cycle text not null check (cycle in ('month','year')),
+  amount bigint not null check (amount > 0),               -- en plus petite unité de la devise (XOF : franc entier)
+  currency text not null check (currency ~ '^[A-Z]{3}$'),
+  status text not null default 'pending' check (status in ('pending','success','failed','cancelled')),
+  period_start timestamptz,                                -- fixé quand le paiement est confirmé
+  period_end timestamptz,
+  checkout_url text,
+  paid_at timestamptz,
+  receipt_number text unique,                              -- reçu PDF généré par Direct Pub
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint period_when_paid check (status <> 'success' or (period_start is not null and period_end > period_start and paid_at is not null))
+);
+create index on payments (organization_id, created_at desc);
+
+-- Webhooks Moneroo déjà traités (ils peuvent arriver plusieurs fois).
+create table payment_events (
+  moneroo_payment_id text not null,
+  event text not null,
+  payload jsonb not null,
+  received_at timestamptz not null default now(),
+  primary key (moneroo_payment_id, event)
 );
 
 -- ---------------------------------------------------------------- déclencheurs, RLS, données de base
@@ -304,13 +396,16 @@ do $$
 declare t text;
 begin
   foreach t in array array['users','organizations','roles','memberships','brands','connections',
-                           'posts','post_variants','published_posts'] loop
+                           'posts','post_variants','published_posts','contacts','contact_lists',
+                           'payments'] loop
     execute format('create trigger %I_updated_at before update on %I for each row execute function set_updated_at()', t, t);
   end loop;
   foreach t in array array['users','organizations','roles','memberships','invitations','brands',
                            'connections','media','posts','post_variants','post_variant_media',
                            'publish_attempts','published_posts','account_metrics_daily','sync_runs',
-                           'notifications','subscriptions','stripe_events'] loop
+                           'notifications','subscriptions','payments','payment_events','contacts',
+                           'contact_lists','contact_list_members','whatsapp_templates',
+                           'message_deliveries'] loop
     execute format('alter table %I enable row level security', t);
   end loop;
 end $$;
