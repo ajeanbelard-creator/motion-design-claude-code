@@ -9,6 +9,11 @@ security audit (`.claude/skills/AUDITED_COMMIT.txt`, changes listed in `THIRD_PA
 `product-launch-video` (no URL capture preset, no HeyGen TTS or music API). The `hyperframes` router stays available
 for other kinds of video.
 
+**UI/UX design**: the `ui-ux-pro-max` skill (Next Level Builder, MIT, copied from commit `281e453`, see
+`THIRD_PARTY_NOTICES.md`) gives local design-system, palette, typography and UX guidance. Run its script from the
+repository root: `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --design-system`. Do not run its
+upstream installer (`uipro`) or update it from the network unless the user explicitly asks.
+
 ## Guardrails (from the audit, non-negotiable)
 
 - Never run `npx hyperframes feedback` (ratings, comments, `--search-miss`), `publish`, `cloud`, `lambda`, `cloudrun`,
