@@ -50,6 +50,26 @@ La copie n'est pas identique à l'amont : elle a été durcie pendant l'audit du
 
 Tous les autres fichiers sont identiques à ceux du commit `281e453`.
 
+## Skills Replica (Jake Schincariol)
+
+- **Auteur** : Jake Schincariol (© 2026 Jake Schincariol)
+- **Licence** : MIT, texte complet dans `.claude/skills/LICENSE-REPLICA-MIT`.
+- **Source** : https://github.com/Jakeschincariol/replica-skill (copie prise depuis le fork https://github.com/ajeanbelard-creator/replica-skill)
+- **Commit audité** : `77c9436fb3d18c3d58169efb8caf4fe906b0dc51` (court : `77c9436`), relecture du 2026-11-23 : scripts Python
+  en bibliothèque standard, aucun appel réseau, aucune commande shell. Seul `replica-test` fait installer Playwright
+  (`npm i -D @playwright/test && npx playwright install chromium`) dans le projet de clone, quand tu lances les tests.
+- **Dossiers copiés** dans `.claude/skills/` : `replica-architect`, `replica-backend`, `replica-brand`, `replica-build`,
+  `replica-deploy`, `replica-design`, `replica-diff`, `replica-entrepreneur`, `replica-launch`, `replica-recon`,
+  `replica-test` (les `tests/`, `.claude-plugin/` et le `README.md` du dépôt amont ne sont pas inclus).
+
+### Fichiers modifiés (MIT)
+
+| Fichier | Changement |
+|---|---|
+| `replica-deploy/SKILL.md` | note sur les chemins `~/.claude/skills/…` remplacée par `.claude/skills/…` (installation dans le dépôt) |
+
+Tous les autres fichiers sont identiques à ceux du commit `77c9436`.
+
 ## Éléments que tu récupères toi-même (non inclus)
 
 - **Polices** : Instrument Sans, Space Mono et Big Shoulders, [Google Fonts](https://fonts.google.com), SIL Open Font License 1.1. Téléchargées dans chaque projet (commandes dans `.claude/skills/motion-design/references/method.md`).
