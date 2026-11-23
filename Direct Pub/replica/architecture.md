@@ -33,8 +33,8 @@ sont à lancer **dès maintenant**, car elles prennent des semaines.
 
 | couche | choix | pourquoi |
 | --- | --- | --- |
-| web | Next.js 15 (App Router) + TypeScript | une seule base de code pour l'interface, les actions serveur et les routes d'API |
-| style | Tailwind CSS + jetons de `/replica-design` | design minimaliste facile à tenir cohérent |
+| web | Next.js 16 (App Router) + TypeScript + React 19 | une seule base de code pour l'interface, les actions serveur et les routes d'API |
+| style | Tailwind CSS 4 + jetons de `replica/design/` (générés en CSS par `web/scripts/tokens.mjs`) | design minimaliste facile à tenir cohérent |
 | composants | Radix UI (primitives sans style) | accessibilité des menus, modales et onglets sans imposer de look |
 | graphiques | Recharts | courbes et barres des statistiques, léger |
 | calendrier | rendu maison + dnd-kit | les vues jour / semaine / mois et le glisser-déposer restent simples à contrôler |
