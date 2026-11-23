@@ -213,6 +213,8 @@ plusieurs consignes envoyaient des données ou mettaient le logiciel à jour san
 - **Skill UI UX Pro Max** (conseils de design d'interface, MIT) : relu le 2026-11-23 et figé au commit `281e453`.
   Il fonctionne entièrement en local (scripts Python, sans dépendance ni appel réseau). Détail dans
   `THIRD_PARTY_NOTICES.md`.
+- **Skills Replica** (cloner, rebrander et lancer une app, MIT) : relus le 2026-11-23 et figés au commit `77c9436`.
+  Scripts Python locaux, sans dépendance ni appel réseau. Détail dans `THIRD_PARTY_NOTICES.md`.
 - **Version figée** : HyperFrames 0.8.82, toutes dépendances verrouillées par `package-lock.json`. Jamais de
   `@latest`.
 - **Télémétrie coupée** : variables d'environnement dans `.claude/settings.json` et `npx hyperframes telemetry disable`
