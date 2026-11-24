@@ -26,6 +26,7 @@ create table users (
   locale text not null default 'fr' check (locale in ('fr','en')),
   timezone text not null default 'Europe/Paris',          -- IANA
   week_start smallint not null default 1 check (week_start in (0,1)), -- 0 dimanche, 1 lundi
+  preferences jsonb not null default '{}',                 -- colonnes affichées des tableaux, densité du calendrier...
   deleted_at timestamptz,                                  -- suppression RGPD : purge par tâche
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -135,6 +136,19 @@ create table connections (
 );
 -- Un seul profil actif par réseau et par marque.
 create unique index connections_one_per_network on connections (brand_id, network) where revoked_at is null;
+
+-- Liaison Telegram : code à usage unique posté dans la chaîne où le bot vient d'être ajouté.
+create table telegram_link_codes (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references brands(id) on delete cascade,
+  created_by uuid references users(id) on delete set null,
+  code_hash text not null unique,
+  expires_at timestamptz not null,                         -- 15 minutes
+  used_at timestamptz,
+  connection_id uuid references connections(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index on telegram_link_codes (brand_id);
 create index on connections (status, token_expires_at);
 create index on connections (last_synced_at) where revoked_at is null;
 
@@ -316,6 +330,15 @@ create table account_metrics_daily (
   primary key (connection_id, day)
 );
 
+-- Consommation des quotas d'API par jour (YouTube : unités par projet ; Instagram : posts par 24 h...).
+create table api_quota_usage (
+  provider text not null,                                  -- 'youtube', 'instagram', 'tiktok'...
+  scope text not null default 'app',                       -- 'app' ou id de connexion
+  day date not null,                                       -- jour du fournisseur (YouTube : heure du Pacifique)
+  units bigint not null default 0 check (units >= 0),
+  primary key (provider, scope, day)
+);
+
 create table sync_runs (
   id uuid primary key default gen_random_uuid(),
   connection_id uuid not null references connections(id) on delete cascade,
@@ -390,6 +413,20 @@ create table payment_events (
   primary key (moneroo_payment_id, event)
 );
 
+-- ---------------------------------------------------------------- index des clés étrangères restantes
+-- Règle : chaque clé étrangère est indexée (suppressions en cascade et jointures rapides).
+create index on invitations (role_id);
+create index on invitations (invited_by);
+create index on connections (connected_by);
+create index on telegram_link_codes (created_by);
+create index on telegram_link_codes (connection_id);
+create index on media (uploaded_by);
+create index on posts (author_user_id);
+create index on posts (duplicated_from);
+create index on notifications (brand_id);
+create index on message_deliveries (contact_id);
+create index on payments (initiated_by);
+
 -- ---------------------------------------------------------------- déclencheurs, RLS, données de base
 
 do $$
@@ -397,11 +434,12 @@ declare t text;
 begin
   foreach t in array array['users','organizations','roles','memberships','brands','connections',
                            'posts','post_variants','published_posts','contacts','contact_lists',
-                           'payments'] loop
+                           'payments','subscriptions','message_deliveries'] loop
     execute format('create trigger %I_updated_at before update on %I for each row execute function set_updated_at()', t, t);
   end loop;
   foreach t in array array['users','organizations','roles','memberships','invitations','brands',
-                           'connections','media','posts','post_variants','post_variant_media',
+                           'connections','telegram_link_codes','api_quota_usage',
+                           'media','posts','post_variants','post_variant_media',
                            'publish_attempts','published_posts','account_metrics_daily','sync_runs',
                            'notifications','subscriptions','payments','payment_events','contacts',
                            'contact_lists','contact_list_members','whatsapp_templates',

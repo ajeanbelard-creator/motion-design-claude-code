@@ -56,20 +56,22 @@ Une seule base, une seule application. Pas de microservices.
 
 ## Schéma
 
-`schema.sql` : **24 tables** en V1, plus 5 rôles par défaut. Vérifié sur Postgres 16 : le
+`schema.sql` : **26 tables** en V1, plus 5 rôles par défaut. Vérifié sur Postgres 16 : le
 fichier se charge sans erreur, et les contraintes clés rejettent les mauvaises données (deux
 comptes du même réseau dans une marque, post planifié sans date, permission inconnue, connexion
 sans jeton hors Telegram, numéro WhatsApp mal formé, paiement réussi sans période).
 
 | table | rôle |
 | --- | --- |
-| `users` | profil (fuseau, langue, 1er jour de semaine) ; l'id est celui de Supabase Auth |
+| `users` | profil (fuseau, langue, 1er jour de semaine, préférences d'affichage) ; l'id est celui de Supabase Auth |
 | `organizations` | propriétaire, plan |
 | `roles` | rôles par défaut (verrouillés) et personnalisés (V2), liste de permissions contrôlée |
 | `memberships` | qui appartient à quelle organisation, avec quel rôle |
 | `invitations` | invitation par e-mail, jeton haché, expiration 24 h |
 | `brands` | marque : nom, image, fuseau, formule d'engagement |
 | `connections` | un profil social par réseau et par marque (index unique partiel), jetons chiffrés, état |
+| `telegram_link_codes` | codes à usage unique pour rattacher une chaîne Telegram à une marque |
+| `api_quota_usage` | consommation quotidienne des quotas d'API (YouTube, Instagram…) |
 | `media` | images et vidéos envoyées sur R2 |
 | `posts` | le post commun : statut, date (UTC), fuseau de saisie, origine |
 | `post_variants` | une déclinaison par réseau : texte, type, options, statut et identifiant externe |
